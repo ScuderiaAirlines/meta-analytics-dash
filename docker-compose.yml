@@ -55,8 +55,6 @@ services:
     networks:
       - meta-analytics-network
     volumes:
-      - ./backend:/app
-      - /app/node_modules
       - ./logs:/app/logs
 
   frontend:

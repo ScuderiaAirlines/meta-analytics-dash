@@ -42,11 +42,17 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 expressjs
 
+# Create logs directory with proper permissions
+RUN mkdir -p /app/logs && chown -R expressjs:nodejs /app/logs
+
 # Copy built application
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/prisma ./prisma
+
+# Set ownership
+RUN chown -R expressjs:nodejs /app
 
 USER expressjs
 
