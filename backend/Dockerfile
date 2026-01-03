@@ -28,7 +28,7 @@ COPY tsconfig.json ./
 COPY src ./src
 
 # Build TypeScript
-RUN npm run build
+RUN npm run build && ls -la dist/
 
 # Production image, copy all the files and run the app
 FROM base AS runner
