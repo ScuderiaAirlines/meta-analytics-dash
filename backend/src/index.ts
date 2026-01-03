@@ -11,6 +11,7 @@ import adsetsRouter from './routes/adsets';
 import adsRouter from './routes/ads';
 import metricsRouter from './routes/metrics';
 import syncRouter from './routes/sync';
+import aiRouter from './routes/ai';
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ app.use('/api/adsets', adsetsRouter);
 app.use('/api/ads', adsRouter);
 app.use('/api/metrics', metricsRouter);
 app.use('/api/sync', syncRouter);
+app.use('/api/ai', aiRouter);
 
 // 404 handler
 app.use(notFoundHandler);
