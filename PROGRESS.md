@@ -12,6 +12,7 @@ This document tracks the completion status of all features and phases.
 - [x] README.md - Project overview, tech stack, setup instructions
 - [x] PROGRESS.md - Feature tracking (this file)
 - [x] GUIDE.md - VPS deployment guide
+- [x] Test-Phase1-2.md - Complete testing guide for Phase 1 & 2
 - [ ] API documentation
 - [ ] Component documentation
 
