@@ -20,7 +20,11 @@ export async function connectDatabase() {
     await prisma.$connect();
     Logger.info('✅ Database connected successfully');
     return true;
-  } catch (error) {
+  } catch (error: any) {
+    console.error('❌ Database connection failed:');
+    console.error('Error message:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Full error:', error);
     Logger.error('❌ Database connection failed:', error);
     return false;
   }
