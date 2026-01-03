@@ -1,0 +1,114 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  campaignId  String   @unique
+  name        String
+  status      String
+  objective   String?
+  dailyBudget Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AdSet {
+  id         String   @id @default(cuid())
+  adsetId    String   @unique
+  campaignId String
+  name       String
+  status     String
+  targeting  Json?
+  placement  Json?
+  budget     Float?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Ad {
+  id           String   @id @default(cuid())
+  adId         String   @unique
+  adsetId      String
+  name         String
+  status       String
+  creativeId   String?
+  thumbnailUrl String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model DailyMetric {
+  id          String   @id @default(cuid())
+  entityId    String
+  entityType  String   // 'campaign', 'adset', 'ad'
+  date        DateTime
+  spend       Float    @default(0)
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  conversions Int      @default(0)
+  cpc         Float    @default(0)
+  ctr         Float    @default(0)
+  roas        Float    @default(0)
+  createdAt   DateTime @default(now())
+
+  @@unique([entityId, entityType, date])
+  @@index([entityId, entityType])
+  @@index([date])
+}
+
+model CreativeAnalysis {
+  id             String   @id @default(cuid())
+  adId           String
+  imageUrl       String
+  aiAnalysis     Json
+  predictedScore Float
+  analyzedAt     DateTime @default(now())
+
+  @@index([adId])
+}
+
+model Anomaly {
+  id               String   @id @default(cuid())
+  entityId         String
+  entityType       String
+  metricName       String
+  expectedValue    Float
+  actualValue      Float
+  deviationPercent Float
+  severity         String   // 'high', 'medium', 'low'
+  aiExplanation    String?
+  detectedAt       DateTime @default(now())
+  resolved         Boolean  @default(false)
+
+  @@index([entityId])
+  @@index([detectedAt])
+  @@index([severity])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OTP {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  used      Boolean  @default(false)
+
+  @@index([email])
+}
