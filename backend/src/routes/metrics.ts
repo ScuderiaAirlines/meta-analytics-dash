@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../utils/prisma';
 import { asyncHandler } from '../utils/middleware';
+import { toISTStartOfDay, toISTEndOfDay } from '../utils/timezone';
 
 const router = Router();
 
@@ -33,10 +34,10 @@ router.get(
     if (startDate || endDate) {
       where.date = {};
       if (startDate) {
-        where.date.gte = new Date(startDate as string);
+        where.date.gte = toISTStartOfDay(startDate as string);
       }
       if (endDate) {
-        where.date.lte = new Date(endDate as string);
+        where.date.lte = toISTEndOfDay(endDate as string);
       }
     }
 

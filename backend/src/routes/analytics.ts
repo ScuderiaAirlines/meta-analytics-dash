@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../utils/prisma';
 import { asyncHandler } from '../utils/middleware';
+import { toISTStartOfDay, toISTEndOfDay, nowIST, getDaysElapsedIST } from '../utils/timezone';
 
 const router = Router();
 
@@ -20,8 +21,9 @@ router.get(
       });
     }
 
-    const start = new Date(startDate as string);
-    const end = new Date(endDate as string);
+    // Parse dates with IST timezone handling
+    const start = toISTStartOfDay(startDate as string);
+    const end = toISTEndOfDay(endDate as string);
 
     // Get current period metrics
     const currentMetrics = await prisma.dailyMetric.findMany({
@@ -74,8 +76,8 @@ router.get(
     let delta = null;
 
     if (previousStart && previousEnd) {
-      const prevStart = new Date(previousStart as string);
-      const prevEnd = new Date(previousEnd as string);
+      const prevStart = toISTStartOfDay(previousStart as string);
+      const prevEnd = toISTEndOfDay(previousEnd as string);
 
       const previousMetrics = await prisma.dailyMetric.findMany({
         where: {
@@ -163,20 +165,16 @@ router.get(
       });
     }
 
-    const start = new Date(startDate as string);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(endDate as string);
-    end.setHours(23, 59, 59, 999);
-    const now = new Date();
+    // Parse dates with IST timezone handling
+    const start = toISTStartOfDay(startDate as string);
+    const end = toISTEndOfDay(endDate as string);
+    const now = nowIST();
 
-    // Calculate period length
+    // Calculate period length in IST
     const totalDays = Math.max(Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)), 1);
 
-    // Calculate elapsed days (capped at totalDays)
-    const daysElapsed = Math.min(
-      Math.max(Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)), 0),
-      totalDays
-    );
+    // Calculate elapsed days in IST (capped at totalDays)
+    const daysElapsed = getDaysElapsedIST(start, end);
 
     const timeElapsedPercent = (daysElapsed / totalDays) * 100;
 
@@ -251,8 +249,9 @@ router.get(
       });
     }
 
-    const start = new Date(startDate as string);
-    const end = new Date(endDate as string);
+    // Parse dates with IST timezone handling
+    const start = toISTStartOfDay(startDate as string);
+    const end = toISTEndOfDay(endDate as string);
 
     // Get all campaigns
     const where: any = {};
@@ -341,8 +340,9 @@ router.get(
       });
     }
 
-    const start = new Date(startDate as string);
-    const end = new Date(endDate as string);
+    // Parse dates with IST timezone handling
+    const start = toISTStartOfDay(startDate as string);
+    const end = toISTEndOfDay(endDate as string);
 
     // Get all metrics in date range
     const metrics = await prisma.dailyMetric.findMany({
@@ -415,8 +415,9 @@ router.get(
       });
     }
 
-    const start = new Date(startDate as string);
-    const end = new Date(endDate as string);
+    // Parse dates with IST timezone handling
+    const start = toISTStartOfDay(startDate as string);
+    const end = toISTEndOfDay(endDate as string);
 
     const metrics = await prisma.dailyMetric.findMany({
       where: {
@@ -468,8 +469,9 @@ router.get(
       });
     }
 
-    const start = new Date(startDate as string);
-    const end = new Date(endDate as string);
+    // Parse dates with IST timezone handling
+    const start = toISTStartOfDay(startDate as string);
+    const end = toISTEndOfDay(endDate as string);
 
     // Get all ads
     const ads = await prisma.ad.findMany({
