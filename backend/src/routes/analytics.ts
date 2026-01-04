@@ -2,6 +2,12 @@ import { Router, Request, Response } from 'express';
 import prisma from '../utils/prisma';
 import { asyncHandler } from '../utils/middleware';
 import { toISTStartOfDay, toISTEndOfDay, nowIST, getDaysElapsedIST } from '../utils/timezone';
+import {
+  aggregateMetrics,
+  calculateDeltas,
+  calculateBudgetPacing,
+  calculateFunnel,
+} from '../utils/mathEngine';
 
 const router = Router();
 
@@ -35,40 +41,17 @@ router.get(
       },
     });
 
-    // Calculate current period totals with weighted ROAS
-    const current = currentMetrics.reduce(
-      (acc, m) => ({
-        totalSpend: acc.totalSpend + m.spend,
-        totalConversions: acc.totalConversions + m.conversions,
-        totalClicks: acc.totalClicks + m.clicks,
-        totalImpressions: acc.totalImpressions + m.impressions,
-        roasWeightedSum: acc.roasWeightedSum + (m.roas * m.spend), // Weighted by spend
-        cpmSum: acc.cpmSum + (m.impressions > 0 ? (m.spend / m.impressions) * 1000 : 0),
-        metricsWithSpend: acc.metricsWithSpend + (m.spend > 0 ? 1 : 0),
-      }),
-      {
-        totalSpend: 0,
-        totalConversions: 0,
-        totalClicks: 0,
-        totalImpressions: 0,
-        roasWeightedSum: 0,
-        cpmSum: 0,
-        metricsWithSpend: 0,
-      }
-    );
+    // Use centralized math engine for all calculations
+    const currentAgg = aggregateMetrics(currentMetrics);
 
     const currentData = {
-      totalSpend: current.totalSpend,
-      totalConversions: current.totalConversions,
-      // Weighted average ROAS (weighted by spend) - more accurate
-      avgROAS: current.totalSpend > 0 ? current.roasWeightedSum / current.totalSpend : 0,
-      avgCPM: current.metricsWithSpend > 0 ? current.cpmSum / current.metricsWithSpend : 0,
-      totalClicks: current.totalClicks,
-      totalImpressions: current.totalImpressions,
-      avgCTR:
-        current.totalImpressions > 0
-          ? (current.totalClicks / current.totalImpressions) * 100
-          : 0,
+      totalSpend: currentAgg.totalSpend,
+      totalConversions: currentAgg.totalConversions,
+      avgROAS: currentAgg.avgROAS,
+      avgCPM: currentAgg.avgCPM,
+      totalClicks: currentAgg.totalClicks,
+      totalImpressions: currentAgg.totalImpressions,
+      avgCTR: currentAgg.avgCTR,
     };
 
     // Get previous period metrics if dates provided
@@ -88,53 +71,23 @@ router.get(
         },
       });
 
-      const previous = previousMetrics.reduce(
-        (acc, m) => ({
-          totalSpend: acc.totalSpend + m.spend,
-          totalConversions: acc.totalConversions + m.conversions,
-          totalClicks: acc.totalClicks + m.clicks,
-          totalImpressions: acc.totalImpressions + m.impressions,
-          roasWeightedSum: acc.roasWeightedSum + (m.roas * m.spend),
-          cpmSum: acc.cpmSum + (m.impressions > 0 ? (m.spend / m.impressions) * 1000 : 0),
-          metricsWithSpend: acc.metricsWithSpend + (m.spend > 0 ? 1 : 0),
-        }),
-        {
-          totalSpend: 0,
-          totalConversions: 0,
-          totalClicks: 0,
-          totalImpressions: 0,
-          roasWeightedSum: 0,
-          cpmSum: 0,
-          metricsWithSpend: 0,
-        }
-      );
+      // Use centralized math engine
+      const previousAgg = aggregateMetrics(previousMetrics);
 
       previousData = {
-        totalSpend: previous.totalSpend,
-        totalConversions: previous.totalConversions,
-        avgROAS: previous.totalSpend > 0 ? previous.roasWeightedSum / previous.totalSpend : 0,
-        avgCPM: previous.metricsWithSpend > 0 ? previous.cpmSum / previous.metricsWithSpend : 0,
+        totalSpend: previousAgg.totalSpend,
+        totalConversions: previousAgg.totalConversions,
+        avgROAS: previousAgg.avgROAS,
+        avgCPM: previousAgg.avgCPM,
       };
 
-      // Calculate deltas - handle edge cases
+      // Calculate deltas using centralized function
+      const allDeltas = calculateDeltas(currentAgg, previousAgg);
       delta = {
-        spend:
-          previousData.totalSpend > 0
-            ? (currentData.totalSpend - previousData.totalSpend) / previousData.totalSpend
-            : currentData.totalSpend > 0 ? 1 : 0,
-        conversions:
-          previousData.totalConversions > 0
-            ? (currentData.totalConversions - previousData.totalConversions) /
-              previousData.totalConversions
-            : currentData.totalConversions > 0 ? 1 : 0,
-        roas:
-          previousData.avgROAS > 0
-            ? (currentData.avgROAS - previousData.avgROAS) / previousData.avgROAS
-            : currentData.avgROAS > 0 ? 1 : 0,
-        cpm:
-          previousData.avgCPM > 0
-            ? (currentData.avgCPM - previousData.avgCPM) / previousData.avgCPM
-            : currentData.avgCPM > 0 ? 1 : 0,
+        spend: allDeltas.spend,
+        conversions: allDeltas.conversions,
+        roas: allDeltas.roas,
+        cpm: allDeltas.cpm,
       };
     }
 
@@ -199,35 +152,19 @@ router.get(
     });
 
     const totalSpent = metrics.reduce((sum, m) => sum + m.spend, 0);
-    const spentPercent = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
 
-    // Calculate pacing - FIXED LOGIC
-    const pacingDelta = spentPercent - timeElapsedPercent;
-    // If spending faster than time passing = ahead
-    // If spending slower than time passing = behind
-    const pacingStatus =
-      Math.abs(pacingDelta) < 5 ? 'on-track' :
-      pacingDelta > 0 ? 'ahead' : 'behind';
-
-    // Project final spend based on current burn rate
-    const dailyBurnRate = daysElapsed > 0 ? totalSpent / daysElapsed : 0;
-    const projected = dailyBurnRate * totalDays;
-    const daysRemaining = Math.max(totalDays - daysElapsed, 0);
+    // Use centralized budget pacing calculation
+    const pacing = calculateBudgetPacing(totalBudget, totalSpent, daysElapsed, totalDays);
 
     res.json({
       success: true,
       data: {
-        totalBudget,
-        spent: totalSpent,
-        spentPercent,
-        timeElapsed: timeElapsedPercent,
-        pacingStatus,
-        pacingDelta,
-        projected,
-        dailyBurnRate,
-        daysRemaining,
+        ...pacing,
+        dailyBurnRate: daysElapsed > 0 ? totalSpent / daysElapsed : 0,
+        daysRemaining: Math.max(totalDays - daysElapsed, 0),
         totalDays,
         daysElapsed,
+        timeElapsed: pacing.timeElapsedPercent,
       },
     });
   })
@@ -278,38 +215,20 @@ router.get(
           },
         });
 
-        const totals = metrics.reduce(
-          (acc, m) => ({
-            spend: acc.spend + m.spend,
-            conversions: acc.conversions + m.conversions,
-            clicks: acc.clicks + m.clicks,
-            impressions: acc.impressions + m.impressions,
-            roasWeightedSum: acc.roasWeightedSum + (m.roas * m.spend),
-            ctrSum: acc.ctrSum + m.ctr,
-            count: acc.count + 1,
-          }),
-          {
-            spend: 0,
-            conversions: 0,
-            clicks: 0,
-            impressions: 0,
-            roasWeightedSum: 0,
-            ctrSum: 0,
-            count: 0,
-          }
-        );
+        // Use centralized math engine
+        const agg = aggregateMetrics(metrics);
 
         return {
           campaignId: campaign.campaignId,
           name: campaign.name,
           status: campaign.status,
           objective: campaign.objective,
-          spend: totals.spend,
-          conversions: totals.conversions,
-          clicks: totals.clicks,
-          impressions: totals.impressions,
-          roas: totals.spend > 0 ? totals.roasWeightedSum / totals.spend : 0,
-          ctr: totals.count > 0 ? totals.ctrSum / totals.count : 0,
+          spend: agg.totalSpend,
+          conversions: agg.totalConversions,
+          clicks: agg.totalClicks,
+          impressions: agg.totalImpressions,
+          roas: agg.avgROAS,
+          ctr: agg.avgCTR,
         };
       })
     );
@@ -428,26 +347,19 @@ router.get(
       },
     });
 
-    const totals = metrics.reduce(
-      (acc, m) => ({
-        impressions: acc.impressions + m.impressions,
-        clicks: acc.clicks + m.clicks,
-        conversions: acc.conversions + m.conversions,
-      }),
-      { impressions: 0, clicks: 0, conversions: 0 }
-    );
-
-    const ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
-    const cvr = totals.clicks > 0 ? (totals.conversions / totals.clicks) * 100 : 0;
+    // Use centralized math engine
+    const agg = aggregateMetrics(metrics);
+    const funnel = calculateFunnel(agg.totalImpressions, agg.totalClicks, agg.totalConversions);
 
     res.json({
       success: true,
       data: {
-        impressions: totals.impressions,
-        clicks: totals.clicks,
-        conversions: totals.conversions,
-        ctr,
-        cvr,
+        impressions: agg.totalImpressions,
+        clicks: agg.totalClicks,
+        conversions: agg.totalConversions,
+        ctr: agg.avgCTR,
+        cvr: agg.avgCVR,
+        funnel: funnel.stages,
       },
     });
   })
@@ -494,14 +406,8 @@ router.get(
           },
         });
 
-        const totals = metrics.reduce(
-          (acc, m) => ({
-            conversions: acc.conversions + m.conversions,
-            spend: acc.spend + m.spend,
-            roasWeightedSum: acc.roasWeightedSum + (m.roas * m.spend),
-          }),
-          { conversions: 0, spend: 0, roasWeightedSum: 0 }
-        );
+        // Use centralized math engine
+        const agg = aggregateMetrics(metrics);
 
         // Get AI analysis if exists
         const analysis = await prisma.creativeAnalysis.findFirst({
@@ -513,9 +419,9 @@ router.get(
           adId: ad.adId,
           name: ad.name,
           thumbnailUrl: ad.thumbnailUrl,
-          conversions: totals.conversions,
-          spend: totals.spend,
-          roas: totals.spend > 0 ? totals.roasWeightedSum / totals.spend : 0,
+          conversions: agg.totalConversions,
+          spend: agg.totalSpend,
+          roas: agg.avgROAS,
           aiScore: analysis?.predictedScore || null,
         };
       })

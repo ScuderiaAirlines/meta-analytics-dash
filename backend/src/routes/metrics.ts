@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import prisma from '../utils/prisma';
 import { asyncHandler } from '../utils/middleware';
 import { toISTStartOfDay, toISTEndOfDay } from '../utils/timezone';
+import { aggregateMetrics } from '../utils/mathEngine';
 
 const router = Router();
 
@@ -50,54 +51,23 @@ router.get(
 
     const total = await prisma.dailyMetric.count({ where });
 
-    // Calculate aggregates with weighted ROAS
-    const aggregates = metrics.reduce(
-      (acc, metric) => ({
-        totalSpend: acc.totalSpend + metric.spend,
-        totalImpressions: acc.totalImpressions + metric.impressions,
-        totalClicks: acc.totalClicks + metric.clicks,
-        totalConversions: acc.totalConversions + metric.conversions,
-        roasWeightedSum: acc.roasWeightedSum + (metric.roas * metric.spend),
-      }),
-      {
-        totalSpend: 0,
-        totalImpressions: 0,
-        totalClicks: 0,
-        totalConversions: 0,
-        roasWeightedSum: 0,
-      }
-    );
-
-    // Calculate proper averages from totals (not simple averages!)
-    const avgCtr = aggregates.totalImpressions > 0
-      ? (aggregates.totalClicks / aggregates.totalImpressions) * 100
-      : 0;
-    const avgCpc = aggregates.totalClicks > 0
-      ? aggregates.totalSpend / aggregates.totalClicks
-      : 0;
-    const avgRoas = aggregates.totalSpend > 0
-      ? aggregates.roasWeightedSum / aggregates.totalSpend
-      : 0;
-    const avgCpm = aggregates.totalImpressions > 0
-      ? (aggregates.totalSpend / aggregates.totalImpressions) * 1000
-      : 0;
-    const avgCvr = aggregates.totalClicks > 0
-      ? (aggregates.totalConversions / aggregates.totalClicks) * 100
-      : 0;
+    // Use centralized math engine for all calculations
+    const aggregated = aggregateMetrics(metrics);
 
     res.json({
       success: true,
       data: metrics,
       aggregates: {
-        totalSpend: aggregates.totalSpend,
-        totalImpressions: aggregates.totalImpressions,
-        totalClicks: aggregates.totalClicks,
-        totalConversions: aggregates.totalConversions,
-        avgCtr,
-        avgCpc,
-        avgRoas,
-        avgCpm,
-        avgCvr,
+        totalSpend: aggregated.totalSpend,
+        totalImpressions: aggregated.totalImpressions,
+        totalClicks: aggregated.totalClicks,
+        totalConversions: aggregated.totalConversions,
+        totalRevenue: aggregated.totalRevenue,
+        avgCtr: aggregated.avgCTR,
+        avgCpc: aggregated.avgCPC,
+        avgRoas: aggregated.avgROAS,
+        avgCpm: aggregated.avgCPM,
+        avgCvr: aggregated.avgCVR,
       },
       pagination: {
         total,
