@@ -4,37 +4,11 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import { DateRangePicker } from "@/components/date-range-picker"
 import { apiClient } from "@/lib/api"
 import { TrendingUp, TrendingDown, DollarSign, Target, MousePointerClick, Percent, AlertCircle } from "lucide-react"
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
-
-// Date range presets
-const getDateRange = (preset: string) => {
-  const end = new Date()
-  const start = new Date()
-
-  switch (preset) {
-    case 'today':
-      start.setHours(0, 0, 0, 0)
-      break
-    case 'yesterday':
-      start.setDate(start.getDate() - 1)
-      start.setHours(0, 0, 0, 0)
-      end.setDate(end.getDate() - 1)
-      end.setHours(23, 59, 59, 999)
-      break
-    case 'last7':
-      start.setDate(start.getDate() - 7)
-      break
-    case 'last30':
-      start.setDate(start.getDate() - 30)
-      break
-    default:
-      start.setDate(start.getDate() - 7)
-  }
-
-  return { start, end }
-}
+import { format, subDays } from "date-fns"
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-IN', {
@@ -62,26 +36,32 @@ export default function DashboardPage() {
   const [topCreatives, setTopCreatives] = useState<any[]>([])
   const [anomalies, setAnomalies] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [datePreset, setDatePreset] = useState('last7')
+
+  // Default to last 7 days
+  const [dateRange, setDateRange] = useState({
+    startDate: format(subDays(new Date(), 6), 'yyyy-MM-dd'),
+    endDate: format(new Date(), 'yyyy-MM-dd'),
+  })
 
   useEffect(() => {
     loadDashboardData()
-  }, [datePreset])
+  }, [dateRange])
 
   const loadDashboardData = async () => {
     try {
       setLoading(true)
-      const { start, end } = getDateRange(datePreset)
+      const start = new Date(dateRange.startDate)
+      const end = new Date(dateRange.endDate)
 
       // Calculate previous period
       const periodLength = end.getTime() - start.getTime()
       const previousEnd = new Date(start.getTime() - 1)
       const previousStart = new Date(previousEnd.getTime() - periodLength)
 
-      const startDate = start.toISOString().split('T')[0]
-      const endDate = end.toISOString().split('T')[0]
-      const previousStartDate = previousStart.toISOString().split('T')[0]
-      const previousEndDate = previousEnd.toISOString().split('T')[0]
+      const startDate = dateRange.startDate
+      const endDate = dateRange.endDate
+      const previousStartDate = format(previousStart, 'yyyy-MM-dd')
+      const previousEndDate = format(previousEnd, 'yyyy-MM-dd')
 
       const [overviewData, budgetData, campaignsData, trendsData, funnelData, creativesData, anomaliesData] = await Promise.all([
         apiClient.getOverview({ startDate, endDate, previousStart: previousStartDate, previousEnd: previousEndDate }),
@@ -144,24 +124,11 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
             <p className="text-sm text-slate-500">Meta Ads Performance Analytics</p>
           </div>
-          <div className="flex gap-2">
-            {['today', 'yesterday', 'last7', 'last30'].map((preset) => (
-              <button
-                key={preset}
-                onClick={() => setDatePreset(preset)}
-                className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                  datePreset === preset
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-                }`}
-              >
-                {preset === 'today' && 'Today'}
-                {preset === 'yesterday' && 'Yesterday'}
-                {preset === 'last7' && 'Last 7 Days'}
-                {preset === 'last30' && 'Last 30 Days'}
-              </button>
-            ))}
-          </div>
+          <DateRangePicker
+            value={dateRange}
+            onChange={setDateRange}
+            className="w-[280px]"
+          />
         </div>
       </div>
 
