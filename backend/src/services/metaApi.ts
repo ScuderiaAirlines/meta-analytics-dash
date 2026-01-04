@@ -90,6 +90,34 @@ class MetaApiClient {
   }
 
   /**
+   * Fetch all pages from a paginated Meta API endpoint
+   */
+  private async fetchAllPages(url: string, params: any): Promise<any[]> {
+    let allResults: any[] = [];
+    let currentUrl: string | null = url;
+
+    while (currentUrl) {
+      const response: any = await this.client.get(currentUrl, { params });
+
+      const data = response.data.data || [];
+      allResults = allResults.concat(data);
+
+      // Check for next page using cursor-based pagination
+      if (response.data.paging?.next) {
+        // Extract just the path and query from the next URL
+        const nextUrl: URL = new URL(response.data.paging.next);
+        currentUrl = nextUrl.pathname + nextUrl.search;
+        // Clear params for subsequent requests (they're in the URL)
+        params = {};
+      } else {
+        currentUrl = null;
+      }
+    }
+
+    return allResults;
+  }
+
+  /**
    * Fetch all campaigns for the ad account
    */
   async getCampaigns(): Promise<any[]> {
@@ -208,43 +236,37 @@ class MetaApiClient {
   }
 
   /**
-   * Get all ad sets across all campaigns
+   * Get all ad sets across all campaigns (with pagination)
    */
   async getAllAdSets(): Promise<any[]> {
-    Logger.info('Fetching all ad sets');
+    Logger.info('Fetching all ad sets (paginated)');
 
     return this.retryWithBackoff(async () => {
-      const response = await this.client.get(`/${this.adAccountId}/adsets`, {
-        params: {
-          access_token: this.accessToken,
-          fields: 'id,campaign_id,name,status,targeting,placement,daily_budget,created_time',
-          limit: 100
-        }
+      const adsets = await this.fetchAllPages(`/${this.adAccountId}/adsets`, {
+        access_token: this.accessToken,
+        fields: 'id,campaign_id,name,status,targeting,placement,daily_budget,created_time',
+        limit: 100
       });
 
-      const adsets = response.data.data || [];
-      Logger.info(`Fetched ${adsets.length} total ad sets`);
+      Logger.info(`Fetched ${adsets.length} total ad sets (all pages)`);
       return adsets;
     });
   }
 
   /**
-   * Get all ads across the account
+   * Get all ads across the account (with pagination)
    */
   async getAllAds(): Promise<any[]> {
-    Logger.info('Fetching all ads');
+    Logger.info('Fetching all ads (paginated)');
 
     return this.retryWithBackoff(async () => {
-      const response = await this.client.get(`/${this.adAccountId}/ads`, {
-        params: {
-          access_token: this.accessToken,
-          fields: 'id,adset_id,name,status,creative{id,thumbnail_url},created_time',
-          limit: 100
-        }
+      const ads = await this.fetchAllPages(`/${this.adAccountId}/ads`, {
+        access_token: this.accessToken,
+        fields: 'id,adset_id,name,status,creative{id,thumbnail_url},created_time',
+        limit: 100
       });
 
-      const ads = response.data.data || [];
-      Logger.info(`Fetched ${ads.length} total ads`);
+      Logger.info(`Fetched ${ads.length} total ads (all pages)`);
       return ads;
     });
   }
