@@ -95,20 +95,28 @@ class MetaApiClient {
   private async fetchAllPages(url: string, params: any): Promise<any[]> {
     let allResults: any[] = [];
     let currentUrl: string | null = url;
+    let currentParams: any = params;
 
     while (currentUrl) {
-      const response: any = await this.client.get(currentUrl, { params });
+      const response: any = await this.client.get(currentUrl, { params: currentParams });
 
       const data = response.data.data || [];
       allResults = allResults.concat(data);
 
+      Logger.info(`Fetched page: ${data.length} items (total so far: ${allResults.length})`);
+
       // Check for next page using cursor-based pagination
       if (response.data.paging?.next) {
-        // Extract just the path and query from the next URL
+        // Meta returns full URL, need to extract path relative to baseURL
         const nextUrl: URL = new URL(response.data.paging.next);
-        currentUrl = nextUrl.pathname + nextUrl.search;
-        // Clear params for subsequent requests (they're in the URL)
-        params = {};
+        const baseUrl: URL = new URL(this.client.defaults.baseURL!);
+
+        // Remove baseURL to get relative path
+        const relativePath = nextUrl.pathname.replace(baseUrl.pathname, '') + nextUrl.search;
+        currentUrl = relativePath;
+
+        // Next URL already has all params, don't send original params
+        currentParams = {};
       } else {
         currentUrl = null;
       }
