@@ -186,8 +186,8 @@ class SyncService {
               conversions = conversionAction ? parseInt(conversionAction.value) : 0;
             }
 
-            // Meta API returns spend in CENTS, convert to currency amount
-            const spend = parseFloat(insight.spend || '0') / 100;
+            // Meta API returns spend directly in account currency (INR for this account)
+            const spend = parseFloat(insight.spend || '0');
             const impressions = parseInt(insight.impressions || '0');
             const clicks = parseInt(insight.clicks || '0');
             // CPC and CTR are already in correct format from Meta
