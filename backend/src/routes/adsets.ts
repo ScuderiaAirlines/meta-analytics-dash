@@ -5,6 +5,44 @@ import { asyncHandler } from '../utils/middleware';
 const router = Router();
 
 /**
+ * GET /api/adsets
+ * List all ad sets with optional filters
+ */
+router.get(
+  '/',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { campaignId, status, limit = '50', offset = '0' } = req.query;
+
+    const where: any = {};
+    if (campaignId) {
+      where.campaignId = campaignId;
+    }
+    if (status) {
+      where.status = status;
+    }
+
+    const adsets = await prisma.adSet.findMany({
+      where,
+      take: parseInt(limit as string),
+      skip: parseInt(offset as string),
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const total = await prisma.adSet.count({ where });
+
+    res.json({
+      success: true,
+      data: adsets,
+      pagination: {
+        total,
+        limit: parseInt(limit as string),
+        offset: parseInt(offset as string),
+      },
+    });
+  })
+);
+
+/**
  * GET /api/adsets/:id
  * Get ad set details with ads and metrics
  */
