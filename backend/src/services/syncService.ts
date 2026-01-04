@@ -186,17 +186,48 @@ class SyncService {
               conversions = conversionAction ? parseInt(conversionAction.value) : 0;
             }
 
-            const spend = parseFloat(insight.spend || '0');
+            // Meta API returns spend in CENTS, convert to currency amount
+            const spend = parseFloat(insight.spend || '0') / 100;
             const impressions = parseInt(insight.impressions || '0');
             const clicks = parseInt(insight.clicks || '0');
+            // CPC and CTR are already in correct format from Meta
             const cpc = parseFloat(insight.cpc || '0');
             const ctr = parseFloat(insight.ctr || '0');
 
-            // Calculate ROAS (assuming conversion value is tracked)
+            // Calculate ROAS from actual purchase value if available
             let roas = 0;
-            if (spend > 0 && conversions > 0) {
-              // This is simplified - in production, you'd get actual conversion values
-              roas = (conversions * 50) / spend; // Assuming $50 average order value
+            if (spend > 0) {
+              // Meta API has two fields:
+              // - actions: Contains action COUNTS (number of purchases)
+              // - action_values: Contains MONETARY VALUES of those actions
+              // We need action_values for ROAS calculation
+
+              let conversionValue = 0;
+
+              // First try to get from action_values (monetary value)
+              if (insight.action_values) {
+                const purchaseValue = insight.action_values.find(
+                  (action: any) =>
+                    action.action_type === 'offsite_conversion.fb_pixel_purchase' ||
+                    action.action_type === 'purchase' ||
+                    action.action_type === 'omni_purchase'
+                );
+
+                if (purchaseValue && purchaseValue.value) {
+                  conversionValue = parseFloat(purchaseValue.value);
+                }
+              }
+
+              // Calculate ROAS if we have conversion value
+              if (conversionValue > 0) {
+                roas = conversionValue / spend;
+              } else if (conversions > 0) {
+                // Fallback: Use environment variable for average order value
+                const avgOrderValue = parseFloat(process.env.AVG_ORDER_VALUE || '0');
+                if (avgOrderValue > 0) {
+                  roas = (conversions * avgOrderValue) / spend;
+                }
+              }
             }
 
             // Upsert metric (create or skip if exists)

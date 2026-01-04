@@ -168,7 +168,7 @@ class MetaApiClient {
           access_token: this.accessToken,
           date_preset: datePreset,
           time_increment: timeIncrement,
-          fields: 'spend,impressions,clicks,actions,cpc,ctr,cpm',
+          fields: 'spend,impressions,clicks,actions,action_values,cpc,ctr,cpm',
           limit: 100
         }
       });
@@ -196,7 +196,7 @@ class MetaApiClient {
           access_token: this.accessToken,
           time_range: JSON.stringify({ since: startDate, until: endDate }),
           time_increment: timeIncrement,
-          fields: 'spend,impressions,clicks,actions,cpc,ctr,cpm',
+          fields: 'spend,impressions,clicks,actions,action_values,cpc,ctr,cpm',
           limit: 100
         }
       });
