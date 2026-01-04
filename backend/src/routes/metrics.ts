@@ -49,36 +49,54 @@ router.get(
 
     const total = await prisma.dailyMetric.count({ where });
 
-    // Calculate aggregates
+    // Calculate aggregates with weighted ROAS
     const aggregates = metrics.reduce(
       (acc, metric) => ({
         totalSpend: acc.totalSpend + metric.spend,
         totalImpressions: acc.totalImpressions + metric.impressions,
         totalClicks: acc.totalClicks + metric.clicks,
         totalConversions: acc.totalConversions + metric.conversions,
+        roasWeightedSum: acc.roasWeightedSum + (metric.roas * metric.spend),
       }),
-      { totalSpend: 0, totalImpressions: 0, totalClicks: 0, totalConversions: 0 }
+      {
+        totalSpend: 0,
+        totalImpressions: 0,
+        totalClicks: 0,
+        totalConversions: 0,
+        roasWeightedSum: 0,
+      }
     );
 
-    // Calculate averages
-    const avgCtr = metrics.length > 0
-      ? metrics.reduce((sum, m) => sum + m.ctr, 0) / metrics.length
+    // Calculate proper averages from totals (not simple averages!)
+    const avgCtr = aggregates.totalImpressions > 0
+      ? (aggregates.totalClicks / aggregates.totalImpressions) * 100
       : 0;
-    const avgCpc = metrics.length > 0
-      ? metrics.reduce((sum, m) => sum + m.cpc, 0) / metrics.length
+    const avgCpc = aggregates.totalClicks > 0
+      ? aggregates.totalSpend / aggregates.totalClicks
       : 0;
-    const avgRoas = metrics.length > 0
-      ? metrics.reduce((sum, m) => sum + m.roas, 0) / metrics.length
+    const avgRoas = aggregates.totalSpend > 0
+      ? aggregates.roasWeightedSum / aggregates.totalSpend
+      : 0;
+    const avgCpm = aggregates.totalImpressions > 0
+      ? (aggregates.totalSpend / aggregates.totalImpressions) * 1000
+      : 0;
+    const avgCvr = aggregates.totalClicks > 0
+      ? (aggregates.totalConversions / aggregates.totalClicks) * 100
       : 0;
 
     res.json({
       success: true,
       data: metrics,
       aggregates: {
-        ...aggregates,
+        totalSpend: aggregates.totalSpend,
+        totalImpressions: aggregates.totalImpressions,
+        totalClicks: aggregates.totalClicks,
+        totalConversions: aggregates.totalConversions,
         avgCtr,
         avgCpc,
         avgRoas,
+        avgCpm,
+        avgCvr,
       },
       pagination: {
         total,
