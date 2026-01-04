@@ -8,20 +8,10 @@ import { apiClient } from "@/lib/api"
 import { TrendingUp, TrendingDown, DollarSign, Target, MousePointerClick, Percent, AlertCircle } from "lucide-react"
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
-// Get current date in IST timezone
-const getISTDate = () => {
-  const now = new Date()
-  // Convert to IST (UTC+5:30)
-  const istOffset = 5.5 * 60 * 60 * 1000
-  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000)
-  return new Date(utcTime + istOffset)
-}
-
-// Date range presets using IST
+// Date range presets
 const getDateRange = (preset: string) => {
-  const istNow = getISTDate()
-  const end = new Date(istNow)
-  const start = new Date(istNow)
+  const end = new Date()
+  const start = new Date()
 
   switch (preset) {
     case 'today':
