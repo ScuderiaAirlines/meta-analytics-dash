@@ -142,6 +142,50 @@ export const apiClient = {
     const response = await api.post('/api/ai/query', { question });
     return response.data.data;
   },
+
+  // Analytics
+  getOverview: async (params: {
+    startDate: string;
+    endDate: string;
+    previousStart?: string;
+    previousEnd?: string;
+  }) => {
+    const response = await api.get('/api/analytics/overview', { params });
+    return response.data.data;
+  },
+
+  getBudgetPacing: async (params: { startDate: string; endDate: string }) => {
+    const response = await api.get('/api/analytics/budget-pacing', { params });
+    return response.data.data;
+  },
+
+  getAnalyticsCampaigns: async (params: {
+    startDate: string;
+    endDate: string;
+    status?: string;
+  }) => {
+    const response = await api.get('/api/analytics/campaigns', { params });
+    return response.data.data;
+  },
+
+  getTrends: async (params: { startDate: string; endDate: string }) => {
+    const response = await api.get('/api/analytics/trends', { params });
+    return response.data.data;
+  },
+
+  getFunnel: async (params: { startDate: string; endDate: string }) => {
+    const response = await api.get('/api/analytics/funnel', { params });
+    return response.data.data;
+  },
+
+  getTopCreatives: async (params: {
+    startDate: string;
+    endDate: string;
+    limit?: number;
+  }) => {
+    const response = await api.get('/api/analytics/top-creatives', { params });
+    return response.data.data;
+  },
 };
 
 export default api;
