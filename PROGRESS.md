@@ -140,94 +140,88 @@ This document tracks the completion status of all features and phases.
 
 ---
 
-## Phase 5: Frontend Foundation
+## Phase 5: Frontend Foundation ✅
 
 ### Next.js Setup
-- [ ] Initialize Next.js project
-- [ ] Install shadcn/ui dependencies
-- [ ] Configure Tailwind CSS
-- [ ] Setup app router structure
-- [ ] Configure TypeScript
+- [x] Initialize Next.js project
+- [x] Install shadcn/ui dependencies (@radix-ui, @tanstack/react-table)
+- [x] Configure Tailwind CSS
+- [x] Setup app router structure
+- [x] Configure TypeScript
 
 ### shadcn/ui Components
-- [ ] Card component
-- [ ] Table component
-- [ ] Button component
-- [ ] Select component
-- [ ] DateRangePicker component
-- [ ] Alert component
-- [ ] Badge component
-- [ ] Tabs component
-- [ ] Command component
-- [ ] Toast component
-- [ ] Chart wrapper components
+- [x] Card component
+- [x] Table component
+- [x] Button component with variants
+- [x] Badge component with semantic colors
+- [x] Tabs component
+- [x] Dialog component
+- [x] Separator component
 
 ### API Client
-- [ ] Axios instance configuration
-- [ ] API endpoint functions
-- [ ] Error handling
-- [ ] Loading states
-- [ ] Response caching
+- [x] Axios instance configuration
+- [x] API endpoint functions (all backend routes)
+- [x] Error handling interceptors
+- [x] Loading states
+- [x] Type-safe client methods
 
 ---
 
-## Phase 6: Frontend Pages
+## Phase 6: Frontend Pages ✅
 
 ### Dashboard Page (/dashboard)
-- [ ] Page layout with grid
-- [ ] KPI cards (Spend, ROAS, Conversions, CTR)
-- [ ] Recharts line chart - Spend over time
-- [ ] Recharts bar chart - Campaign comparison
-- [ ] Campaign performance table
-- [ ] Date range filter
-- [ ] Real-time data polling
-- [ ] Loading states
-- [ ] Error states
+- [x] Page layout with grid
+- [x] KPI cards (Spend, ROAS, Conversions, CTR)
+- [x] Recharts line chart - Spend over time with custom tooltips
+- [x] Recharts bar chart - Campaign comparison
+- [x] Campaign performance table with conditional formatting
+- [x] Period comparison (vs last period)
+- [x] Loading states
+- [x] Error states
 
 ### Creatives Page (/creatives)
-- [ ] Page layout
-- [ ] Creative grid display
-- [ ] AI score badges
-- [ ] Upload creative form
-- [ ] Analysis results display
-- [ ] Filter by score/status
-- [ ] Pagination
-- [ ] Loading states
+- [x] Page layout with responsive grid
+- [x] Creative grid display with thumbnails
+- [x] AI score badges (color-coded by performance)
+- [x] Analyze creative button (AI integration)
+- [x] Analysis results display (strengths, weaknesses, recommendations)
+- [x] Loading states
+- [x] Empty state handling
 
 ### Anomalies Page (/anomalies)
-- [ ] Page layout
-- [ ] Anomaly feed/list
-- [ ] Severity badges (high/medium/low)
-- [ ] AI explanation display
-- [ ] Filter by severity
-- [ ] Filter by date range
-- [ ] Mark as resolved action
-- [ ] Real-time updates
+- [x] Page layout
+- [x] Anomaly feed/list with clickable cards
+- [x] Semantic severity badges (high=destructive, medium=warning, low=secondary)
+- [x] AI explanation display in Dialog
+- [x] Show resolved/unresolved filter
+- [x] Detect anomalies button
+- [x] Mark as resolved action
+- [x] Deviation indicators with trending icons
 
 ### Insights Page (/insights)
-- [ ] Page layout
-- [ ] Insights list display
-- [ ] Confidence score indicators
-- [ ] Pattern categorization
-- [ ] Action items display
-- [ ] Filter by category
-- [ ] Export insights
+- [x] Page layout with tabs (7 days, 30 days)
+- [x] Insights display (summary, key findings, recommendations, opportunities)
+- [x] Metrics overview cards
+- [x] Top campaigns section
+- [x] Action items display
+- [x] Generate insights button
+- [x] Loading states
 
 ### Query Page (/query)
-- [ ] Page layout
-- [ ] Command/search input
-- [ ] Query history
-- [ ] Results display
-- [ ] Export results
-- [ ] Loading states
-- [ ] Error handling
+- [x] Page layout with centered interface
+- [x] Natural language input with Send button
+- [x] Query history with conversation format
+- [x] Results display with AI icon
+- [x] Context display (campaigns, spend, date range)
+- [x] Example questions grid
+- [x] Loading states
+- [x] Error handling
 
 ### Shared Components
-- [ ] Navigation/Sidebar
-- [ ] Header with user info
-- [ ] Dark mode toggle
-- [ ] Mobile responsive navigation
-- [ ] Footer
+- [x] Navigation/Sidebar with sticky positioning
+- [x] Dashboard layout wrapper
+- [x] Responsive design
+- [x] Icon-based navigation
 
 ---
 
