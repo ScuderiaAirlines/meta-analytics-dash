@@ -33,33 +33,34 @@ router.get(
       },
     });
 
-    // Calculate current period totals
+    // Calculate current period totals with weighted ROAS
     const current = currentMetrics.reduce(
       (acc, m) => ({
         totalSpend: acc.totalSpend + m.spend,
         totalConversions: acc.totalConversions + m.conversions,
         totalClicks: acc.totalClicks + m.clicks,
         totalImpressions: acc.totalImpressions + m.impressions,
-        roasSum: acc.roasSum + m.roas,
+        roasWeightedSum: acc.roasWeightedSum + (m.roas * m.spend), // Weighted by spend
         cpmSum: acc.cpmSum + (m.impressions > 0 ? (m.spend / m.impressions) * 1000 : 0),
-        count: acc.count + 1,
+        metricsWithSpend: acc.metricsWithSpend + (m.spend > 0 ? 1 : 0),
       }),
       {
         totalSpend: 0,
         totalConversions: 0,
         totalClicks: 0,
         totalImpressions: 0,
-        roasSum: 0,
+        roasWeightedSum: 0,
         cpmSum: 0,
-        count: 0,
+        metricsWithSpend: 0,
       }
     );
 
     const currentData = {
       totalSpend: current.totalSpend,
       totalConversions: current.totalConversions,
-      avgROAS: current.count > 0 ? current.roasSum / current.count : 0,
-      avgCPM: current.count > 0 ? current.cpmSum / current.count : 0,
+      // Weighted average ROAS (weighted by spend) - more accurate
+      avgROAS: current.totalSpend > 0 ? current.roasWeightedSum / current.totalSpend : 0,
+      avgCPM: current.metricsWithSpend > 0 ? current.cpmSum / current.metricsWithSpend : 0,
       totalClicks: current.totalClicks,
       totalImpressions: current.totalImpressions,
       avgCTR:
@@ -91,47 +92,47 @@ router.get(
           totalConversions: acc.totalConversions + m.conversions,
           totalClicks: acc.totalClicks + m.clicks,
           totalImpressions: acc.totalImpressions + m.impressions,
-          roasSum: acc.roasSum + m.roas,
+          roasWeightedSum: acc.roasWeightedSum + (m.roas * m.spend),
           cpmSum: acc.cpmSum + (m.impressions > 0 ? (m.spend / m.impressions) * 1000 : 0),
-          count: acc.count + 1,
+          metricsWithSpend: acc.metricsWithSpend + (m.spend > 0 ? 1 : 0),
         }),
         {
           totalSpend: 0,
           totalConversions: 0,
           totalClicks: 0,
           totalImpressions: 0,
-          roasSum: 0,
+          roasWeightedSum: 0,
           cpmSum: 0,
-          count: 0,
+          metricsWithSpend: 0,
         }
       );
 
       previousData = {
         totalSpend: previous.totalSpend,
         totalConversions: previous.totalConversions,
-        avgROAS: previous.count > 0 ? previous.roasSum / previous.count : 0,
-        avgCPM: previous.count > 0 ? previous.cpmSum / previous.count : 0,
+        avgROAS: previous.totalSpend > 0 ? previous.roasWeightedSum / previous.totalSpend : 0,
+        avgCPM: previous.metricsWithSpend > 0 ? previous.cpmSum / previous.metricsWithSpend : 0,
       };
 
-      // Calculate deltas
+      // Calculate deltas - handle edge cases
       delta = {
         spend:
           previousData.totalSpend > 0
             ? (currentData.totalSpend - previousData.totalSpend) / previousData.totalSpend
-            : 0,
+            : currentData.totalSpend > 0 ? 1 : 0,
         conversions:
           previousData.totalConversions > 0
             ? (currentData.totalConversions - previousData.totalConversions) /
               previousData.totalConversions
-            : 0,
+            : currentData.totalConversions > 0 ? 1 : 0,
         roas:
           previousData.avgROAS > 0
             ? (currentData.avgROAS - previousData.avgROAS) / previousData.avgROAS
-            : 0,
+            : currentData.avgROAS > 0 ? 1 : 0,
         cpm:
           previousData.avgCPM > 0
             ? (currentData.avgCPM - previousData.avgCPM) / previousData.avgCPM
-            : 0,
+            : currentData.avgCPM > 0 ? 1 : 0,
       };
     }
 
@@ -163,22 +164,31 @@ router.get(
     }
 
     const start = new Date(startDate as string);
+    start.setHours(0, 0, 0, 0);
     const end = new Date(endDate as string);
+    end.setHours(23, 59, 59, 999);
     const now = new Date();
 
-    // Calculate period length and elapsed days
-    const totalDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    const daysElapsed = Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    const timeElapsedPercent = Math.min((daysElapsed / totalDays) * 100, 100);
+    // Calculate period length
+    const totalDays = Math.max(Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)), 1);
 
-    // Get all campaigns to sum budgets
+    // Calculate elapsed days (capped at totalDays)
+    const daysElapsed = Math.min(
+      Math.max(Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)), 0),
+      totalDays
+    );
+
+    const timeElapsedPercent = (daysElapsed / totalDays) * 100;
+
+    // Get all active campaigns to sum budgets
     const campaigns = await prisma.campaign.findMany({
       where: {
         status: 'ACTIVE',
       },
     });
 
-    const totalBudget = campaigns.reduce((sum, c) => sum + (c.dailyBudget || 0), 0) * totalDays;
+    const totalDailyBudget = campaigns.reduce((sum, c) => sum + (c.dailyBudget || 0), 0);
+    const totalBudget = totalDailyBudget * totalDays;
 
     // Get total spend in period
     const metrics = await prisma.dailyMetric.findMany({
@@ -193,13 +203,18 @@ router.get(
     const totalSpent = metrics.reduce((sum, m) => sum + m.spend, 0);
     const spentPercent = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0;
 
-    // Calculate pacing
+    // Calculate pacing - FIXED LOGIC
     const pacingDelta = spentPercent - timeElapsedPercent;
-    const pacingStatus = Math.abs(pacingDelta) < 5 ? 'on-track' : pacingDelta > 0 ? 'ahead' : 'behind';
+    // If spending faster than time passing = ahead
+    // If spending slower than time passing = behind
+    const pacingStatus =
+      Math.abs(pacingDelta) < 5 ? 'on-track' :
+      pacingDelta > 0 ? 'ahead' : 'behind';
 
-    // Project final spend
+    // Project final spend based on current burn rate
     const dailyBurnRate = daysElapsed > 0 ? totalSpent / daysElapsed : 0;
     const projected = dailyBurnRate * totalDays;
+    const daysRemaining = Math.max(totalDays - daysElapsed, 0);
 
     res.json({
       success: true,
@@ -212,7 +227,9 @@ router.get(
         pacingDelta,
         projected,
         dailyBurnRate,
-        daysRemaining: Math.max(totalDays - daysElapsed, 0),
+        daysRemaining,
+        totalDays,
+        daysElapsed,
       },
     });
   })
@@ -268,7 +285,7 @@ router.get(
             conversions: acc.conversions + m.conversions,
             clicks: acc.clicks + m.clicks,
             impressions: acc.impressions + m.impressions,
-            roasSum: acc.roasSum + m.roas,
+            roasWeightedSum: acc.roasWeightedSum + (m.roas * m.spend),
             ctrSum: acc.ctrSum + m.ctr,
             count: acc.count + 1,
           }),
@@ -277,7 +294,7 @@ router.get(
             conversions: 0,
             clicks: 0,
             impressions: 0,
-            roasSum: 0,
+            roasWeightedSum: 0,
             ctrSum: 0,
             count: 0,
           }
@@ -292,7 +309,7 @@ router.get(
           conversions: totals.conversions,
           clicks: totals.clicks,
           impressions: totals.impressions,
-          roas: totals.count > 0 ? totals.roasSum / totals.count : 0,
+          roas: totals.spend > 0 ? totals.roasWeightedSum / totals.spend : 0,
           ctr: totals.count > 0 ? totals.ctrSum / totals.count : 0,
         };
       })
@@ -350,7 +367,7 @@ router.get(
           conversions: 0,
           clicks: 0,
           impressions: 0,
-          roasSum: 0,
+          roasWeightedSum: 0,
           count: 0,
         });
       }
@@ -360,7 +377,7 @@ router.get(
       entry.conversions += m.conversions;
       entry.clicks += m.clicks;
       entry.impressions += m.impressions;
-      entry.roasSum += m.roas;
+      entry.roasWeightedSum += (m.roas * m.spend);
       entry.count += 1;
     });
 
@@ -371,7 +388,7 @@ router.get(
       conversions: entry.conversions,
       clicks: entry.clicks,
       impressions: entry.impressions,
-      roas: entry.count > 0 ? entry.roasSum / entry.count : 0,
+      roas: entry.spend > 0 ? entry.roasWeightedSum / entry.spend : 0,
       ctr: entry.impressions > 0 ? (entry.clicks / entry.impressions) * 100 : 0,
     }));
 
@@ -479,10 +496,9 @@ router.get(
           (acc, m) => ({
             conversions: acc.conversions + m.conversions,
             spend: acc.spend + m.spend,
-            roasSum: acc.roasSum + m.roas,
-            count: acc.count + 1,
+            roasWeightedSum: acc.roasWeightedSum + (m.roas * m.spend),
           }),
-          { conversions: 0, spend: 0, roasSum: 0, count: 0 }
+          { conversions: 0, spend: 0, roasWeightedSum: 0 }
         );
 
         // Get AI analysis if exists
@@ -497,7 +513,7 @@ router.get(
           thumbnailUrl: ad.thumbnailUrl,
           conversions: totals.conversions,
           spend: totals.spend,
-          roas: totals.count > 0 ? totals.roasSum / totals.count : 0,
+          roas: totals.spend > 0 ? totals.roasWeightedSum / totals.spend : 0,
           aiScore: analysis?.predictedScore || null,
         };
       })
