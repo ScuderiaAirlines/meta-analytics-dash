@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import prisma from '../utils/prisma';
 import { asyncHandler } from '../utils/middleware';
 import Logger from '../utils/logger';
+import { aggregateMetrics } from '../utils/mathEngine';
 
 const router = Router();
 
@@ -78,41 +79,19 @@ router.get(
       orderBy: { date: 'desc' },
     });
 
-    // Calculate summary stats with proper metrics
-    const totals = metrics.reduce(
-      (acc, metric) => ({
-        totalSpend: acc.totalSpend + metric.spend,
-        totalImpressions: acc.totalImpressions + metric.impressions,
-        totalClicks: acc.totalClicks + metric.clicks,
-        totalConversions: acc.totalConversions + metric.conversions,
-        roasWeightedSum: acc.roasWeightedSum + (metric.roas * metric.spend),
-      }),
-      {
-        totalSpend: 0,
-        totalImpressions: 0,
-        totalClicks: 0,
-        totalConversions: 0,
-        roasWeightedSum: 0,
-      }
-    );
+    // Use centralized math engine for all calculations
+    const agg = aggregateMetrics(metrics);
 
     const summary = {
-      totalSpend: totals.totalSpend,
-      totalImpressions: totals.totalImpressions,
-      totalClicks: totals.totalClicks,
-      totalConversions: totals.totalConversions,
-      avgCtr:
-        totals.totalImpressions > 0
-          ? (totals.totalClicks / totals.totalImpressions) * 100
-          : 0,
-      avgCpc: totals.totalClicks > 0 ? totals.totalSpend / totals.totalClicks : 0,
-      avgRoas: totals.totalSpend > 0 ? totals.roasWeightedSum / totals.totalSpend : 0,
-      avgCpm:
-        totals.totalImpressions > 0
-          ? (totals.totalSpend / totals.totalImpressions) * 1000
-          : 0,
-      avgCvr:
-        totals.totalClicks > 0 ? (totals.totalConversions / totals.totalClicks) * 100 : 0,
+      totalSpend: agg.totalSpend,
+      totalImpressions: agg.totalImpressions,
+      totalClicks: agg.totalClicks,
+      totalConversions: agg.totalConversions,
+      avgCtr: agg.avgCTR,
+      avgCpc: agg.avgCPC,
+      avgRoas: agg.avgROAS,
+      avgCpm: agg.avgCPM,
+      avgCvr: agg.avgCVR,
     };
 
     res.json({
