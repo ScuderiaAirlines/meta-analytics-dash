@@ -1,0 +1,10 @@
+# Meta Ads to Supabase ETL Script Dependencies
+
+# Meta API
+facebook-business==18.0.0
+
+# Supabase
+supabase==2.3.0
+
+# Environment variables
+python-dotenv==1.0.0
