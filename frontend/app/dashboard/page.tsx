@@ -8,14 +8,25 @@ import { apiClient } from "@/lib/api"
 import { TrendingUp, TrendingDown, DollarSign, Target, MousePointerClick, Percent, AlertCircle } from "lucide-react"
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
-// Date range presets
+// Get current date in IST timezone
+const getISTDate = () => {
+  const now = new Date()
+  // Convert to IST (UTC+5:30)
+  const istOffset = 5.5 * 60 * 60 * 1000
+  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000)
+  return new Date(utcTime + istOffset)
+}
+
+// Date range presets using IST
 const getDateRange = (preset: string) => {
-  const end = new Date()
-  const start = new Date()
+  const istNow = getISTDate()
+  const end = new Date(istNow)
+  const start = new Date(istNow)
 
   switch (preset) {
     case 'today':
       start.setHours(0, 0, 0, 0)
+      end.setHours(23, 59, 59, 999)
       break
     case 'yesterday':
       start.setDate(start.getDate() - 1)
@@ -24,13 +35,16 @@ const getDateRange = (preset: string) => {
       end.setHours(23, 59, 59, 999)
       break
     case 'last7':
-      start.setDate(start.getDate() - 7)
+      start.setDate(start.getDate() - 6)
+      start.setHours(0, 0, 0, 0)
       break
     case 'last30':
-      start.setDate(start.getDate() - 30)
+      start.setDate(start.getDate() - 29)
+      start.setHours(0, 0, 0, 0)
       break
     default:
-      start.setDate(start.getDate() - 7)
+      start.setDate(start.getDate() - 6)
+      start.setHours(0, 0, 0, 0)
   }
 
   return { start, end }
