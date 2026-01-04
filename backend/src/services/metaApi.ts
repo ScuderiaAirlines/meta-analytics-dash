@@ -94,32 +94,28 @@ class MetaApiClient {
    */
   private async fetchAllPages(url: string, params: any): Promise<any[]> {
     let allResults: any[] = [];
-    let currentUrl: string | null = url;
-    let currentParams: any = params;
+    let nextPageUrl: string | null = null;
+    let isFirstPage = true;
 
-    while (currentUrl) {
-      const response: any = await this.client.get(currentUrl, { params: currentParams });
+    while (isFirstPage || nextPageUrl) {
+      let response: any;
+
+      if (isFirstPage) {
+        // First page: use relative URL with axios client (has baseURL)
+        response = await this.client.get(url, { params });
+        isFirstPage = false;
+      } else {
+        // Subsequent pages: use full URL from Meta's paging.next directly
+        response = await axios.get(nextPageUrl!, { timeout: 30000 });
+      }
 
       const data = response.data.data || [];
       allResults = allResults.concat(data);
 
       Logger.info(`Fetched page: ${data.length} items (total so far: ${allResults.length})`);
 
-      // Check for next page using cursor-based pagination
-      if (response.data.paging?.next) {
-        // Meta returns full URL, need to extract path relative to baseURL
-        const nextUrl: URL = new URL(response.data.paging.next);
-        const baseUrl: URL = new URL(this.client.defaults.baseURL!);
-
-        // Remove baseURL to get relative path
-        const relativePath = nextUrl.pathname.replace(baseUrl.pathname, '') + nextUrl.search;
-        currentUrl = relativePath;
-
-        // Next URL already has all params, don't send original params
-        currentParams = {};
-      } else {
-        currentUrl = null;
-      }
+      // Check for next page
+      nextPageUrl = response.data.paging?.next || null;
     }
 
     return allResults;
